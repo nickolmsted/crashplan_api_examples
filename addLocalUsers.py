@@ -30,7 +30,7 @@ import requests
 #cp_port = "<PORT>" ex: 4280 or 4285
 #cp_username = "<username>"
 #cp_password = "<pw>"
-#cp_ldap_orgId = "<Org Id>" ex: 3
+#cp_orgId = "<Org Id>" ex: 3
 #cp_csv_file_name = "<filename.csv>" note: Place in same location as python script
 cp_api = "/api/user"
 
