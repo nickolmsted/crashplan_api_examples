@@ -13,8 +13,8 @@
 # 3 arg - set to deactivate devices or only print the devices that will be deactivated, but not deactivate them.
 #        - values: deactivate, print
 # Example usages: 
-# python deactivateDevices.py 3 verbose print
-# python deactivateDevices.py 3 noverbose deactivate
+# python deactivateDevices.py 3 print DEBUG
+# python deactivateDevices.py 3 deactivate
 #
 # NOTE: Make sure to set cpc_host, cpc_port, cpc_username, cpc_password to your environments values.
 #
@@ -40,11 +40,13 @@ from datetime import *
 # Number of Months of no backup (should be a number)
 MAX_NUM_OF_MONTHS = str(sys.argv[1])
 
-# verbose logging (should be text with words "verbose" or "noverbose")
-VERBOSE_LOGGING = str(sys.argv[2])
-
 # Deactivate devices (should be text that equals "deactivate")
-RUN_DEACTIVATION_SCRIPT = str(sys.argv[3])
+RUN_DEACTIVATION_SCRIPT = str(sys.argv[2])
+
+# verbose logging (set to DEBUG for additional console output)
+cp_logLevel = "INFO"
+if len(sys.argv)==4:
+    cp_logLevel = str(sys.argv[3])
 
 MAX_PAGE_NUM = 250
 NOW = datetime.now()
@@ -52,9 +54,14 @@ NOW = datetime.now()
 # Set to your environments vlaues
 cpc_host = "<HOST OR IP ADDRESS>"
 cpc_port = "<PORT>"
-
 cpc_username = "<username"
 cpc_password = "<pw>"
+
+# Test values
+#cpc_host = "localhost"
+#cpc_port = "4285"
+#cpc_username = "admin"
+#cpc_password = "admin"
 
 #
 # Compute base64 representation of the authentication token.
@@ -73,9 +80,7 @@ def getAuthHeader(u,p):
 # Returns: total number of requests needed
 #
 def getDevicesPageCount():
-    if (VERBOSE_LOGGING == "verbose"):
-        print "BEGIN - getDevicesPageCount"
-        logging.debug("BEGIN - getDevicesPageCount")
+    logging.debug("BEGIN - getDevicesPageCount")
 
     headers = {"Authorization":getAuthHeader(cpc_username,cpc_password),"Accept":"application/json"}
 
@@ -91,20 +96,19 @@ def getDevicesPageCount():
         # num of requests is rounding down and not up. Add+1 as we know we are completed because the computerId value returns as 0
         numOfRequests = math.ceil(totalCount/MAX_PAGE_NUM)+1
 
-        if (VERBOSE_LOGGING == "verbose"):
-           print "numOfRequests: " + str(numOfRequests)
-           print "END - getDevicesPageCount"
+        logging.debug("numOfRequests: " + str(numOfRequests))
+        logging.debug("END - getDevicesPageCount")
         return numOfRequests
 
     except httplib.HTTPException as inst:
 
-        print "Exception: %s" % inst
+        logging.error("Exception: %s" % inst)
 
         return None
 
     except ValueError as inst:
 
-        print "Exception decoding JSON: %s" % inst
+        logging.error("Exception decoding JSON: %s" % inst)
 
         return None
 
@@ -123,8 +127,6 @@ def getDevicesPageCount():
 def getDevices(totalNumOfRequests):
 
     logging.debug("BEGIN - getDevices")
-    if (VERBOSE_LOGGING == "verbose"):
-        print "BEGIN - getDevices"
 
     headers = {"Authorization":getAuthHeader(cpc_username,cpc_password),"Accept":"application/json"}
 
@@ -135,8 +137,6 @@ def getDevices(totalNumOfRequests):
     while (currentRequestCount <= totalNumOfRequests):
 
         logging.debug("BEGIN - getDevices - Building devices list request count: " + str(currentRequestCount))
-        if (VERBOSE_LOGGING == "verbose"):
-            print "BEGIN - getDevices - Building devices list request count: " + str(currentRequestCount)
 
         try:
             currentRequestCount = currentRequestCount + 1
@@ -146,13 +146,13 @@ def getDevices(totalNumOfRequests):
             conn.close()
         except httplib.HTTPException as inst:
 
-            print "Exception: %s" % inst
+            logging.error("Exception: %s" % inst)
 
             return None
 
         except ValueError as inst:
 
-            print "Exception decoding JSON: %s" % inst
+            logging.error("Exception decoding JSON: %s" % inst)
 
             return None
 
@@ -165,34 +165,22 @@ def getDevices(totalNumOfRequests):
             # If last connected date is greater than month threshold than add device to deactivate list
             dtLastConnected = datetime.strptime(str(lastConnected)[:10], "%Y-%m-%d")
             comparedate = datetime(dtLastConnected.year, dtLastConnected.month, dtLastConnected.day)
-            three_months = NOW+relativedelta(months=-3)
-            if three_months > comparedate:
-                if (VERBOSE_LOGGING == "verbose"):
-                    try:
-                        logging.debug("DEACTIVATE - device id: " + str(computerId) + " device name: " + str(deviceName) + " with last connected date of: " + str(lastConnected))
-                        print "DEACTIVATE - device id: " + str(computerId) + " device name: " + str(deviceName) + " with last connected date of: " + str(lastConnected)
-                    except:
-                        #ignore name errors
-                        pass
+            monthThreshold = NOW+relativedelta(months=-int(MAX_NUM_OF_MONTHS))
+            if monthThreshold > comparedate:
+                try:
+                    logging.debug("DEACTIVATE - device id: " + str(computerId) + " device name: " + str(deviceName) + " with last connected date of: " + str(lastConnected))
+                except:
+                    #ignore name errors
+                    pass
                 deactivateCount = deactivateCount + 1
                 deactivateList.append(d)
             else:
-                if (VERBOSE_LOGGING == "verbose"):
-                    logging.debug("IGNORE - device id: " + str(computerId) + " with last connected date of: " + str(lastConnected))
-                    print "IGNORE - device id: " + str(computerId) + " with last connected date of: " + str(lastConnected)
+                logging.debug("IGNORE - device id: " + str(computerId) + " with last connected date of: " + str(lastConnected))
         
-        if (VERBOSE_LOGGING == "verbose"):
-            logging.debug("END - getDevices - Building devices list request count: " + str(currentRequestCount))
-            print "END - getDevices - Building devices list request count: " + str(currentRequestCount)
-        else:
-            logging.debug("Building devices list... request count:  " + str(currentRequestCount))
-            print "Building devices list... request count:  " + str(currentRequestCount)
+        logging.info("Building devices list... request count:  " + str(currentRequestCount))
 
-    if (VERBOSE_LOGGING == "verbose"):
         logging.debug("TOTAL Devices that are scheduled to be deactivated: " + str(deactivateCount))
         logging.debug("END - getDevices")
-        print "TOTAL Devices that are scheduled to be deactivated: " + str(deactivateCount)
-        print "END - getDevices"
 
     return deactivateList
 
@@ -201,24 +189,18 @@ def getDevices(totalNumOfRequests):
 #
 def printDevices(devices):
     count = 0
-    if (VERBOSE_LOGGING == "verbose"):
-        logging.debug("BEGIN - printDevices")
-        print "BEGIN - printDevices"
+    logging.debug("BEGIN - printDevices")
 
-    logging.debug("The following devices will be deactivated as they have not connected in more than " + str(MAX_NUM_OF_MONTHS) + " months:")
-    print "The following devices will be deactivated as they have not connected in more than " + str(MAX_NUM_OF_MONTHS) + " months:"
+    logging.debug("The following devices will be deactivated as they have not connected in more than " + str(MAX_NUM_OF_MONTHS) + " month(s):")
     for d in devices:
         count = count + 1
         try:
-            logging.debug("device name: " + str(d['name']))
-            print "device name: " + str(d['name'])
+            logging.info("device name: " + str(d['name']))
         except:
             #ignore any name exceptions
             pass
 
-    if (VERBOSE_LOGGING == "verbose"):
-        logging.debug("END - printDevices")
-        print "END - printDevices"
+    logging.debug("END - printDevices")
 
     return count
 
@@ -244,31 +226,46 @@ def deactivateDevice(computerId):
 
     except httplib.HTTPException as inst:
 
-        print "Exception in HTTP operations: %s" % inst
+        logging.error("Exception in HTTP operations: %s" % inst)
 
         return None
 
     except ValueError as inst:
 
-        print "Exception decoding JSON: %s" % inst
+        logging.error("Exception decoding JSON: %s" % inst)
 
         return None
 
 #
-# Returns logging levels based on passed in argument
+# Sets logger to file and console
 #
-def getLoggingLevel():
-    logging.basicConfig(filename='deactivateDevices.log',level=logging.DEBUG, format='%(asctime)s %(message)s')
+def setLoggingLevel():
+    # set up logging to file
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                        datefmt='%m-%d %H:%M',
+                        filename='deactivateDevices.log',
+                        filemode='w')
+    # define a Handler which writes INFO messages or higher to the sys.stderr
+    console = logging.StreamHandler()
+    
+    if(cp_logLevel=="DEBUG"):
+        console.setLevel(logging.DEBUG)
+    else:
+        console.setLevel(logging.INFO)
+    
+    # set a format which is simpler for console use
+    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+    # tell the handler to use this format
+    console.setFormatter(formatter)
+    # add the handler to the root logger
+    logging.getLogger('').addHandler(console)
 
 #
 # Deactivates devices if argument is set to deacivate
 #
 def deactivateDevices():
-    logging.debug("START - DeactivateDevices")
-
-    if (VERBOSE_LOGGING == "verbose"):
-        logging.debug("BEGIN - deactivateDevices")
-        print "BEGIN - deactivateDevices"
+    logging.debug("BEGIN - deactivateDevices")
 
     pageCount = getDevicesPageCount()
     devices = getDevices(pageCount)
@@ -277,36 +274,26 @@ def deactivateDevices():
     count = 0
     # Deactivate devices
     if (RUN_DEACTIVATION_SCRIPT == "deactivate"):
-        logging.debug("RUN_DEACTIVATION_SCRIPT set to true")
-        print "RUN_DEACTIVATION_SCRIPT set to true"
+        logging.info("RUN_DEACTIVATION_SCRIPT set to true")
 
         for d in devices:
             succ = deactivateDevice(d["computerId"])
             try:
                 if succ:
                     count = count + 1
-                    logging.debug("Deactivation successful for id: " + str(d["computerId"]) + " device name: " + str(d["name"]))
-                    print "Deactivation successful for id: " + str(d["computerId"]) + " device name: " + str(d["name"])
+                    logging.info("Deactivation successful for id: " + str(d["computerId"]) + " device name: " + str(d["name"]))
                 else:
-                    logging.debug("Deactivation unsuccessful for id: " + str(d["computerId"]) + " device name: " + str(d["name"]))
-                    print "Deactivation unsuccessful for id: " + str(d["computerId"]) + " device name: " + str(d["name"])
+                    logging.info("Deactivation unsuccessful for id: " + str(d["computerId"]) + " device name: " + str(d["name"]))
             except:
                 #ignore any name errors
                 pass
     else:
-        logging.debug("RUN_DEACTIVATION_SCRIPT set to false")
-        print "RUN_DEACTIVATION_SCRIPT set to false"
+        logging.info("RUN_DEACTIVATION_SCRIPT set to false")
 
-    logging.debug("TOTAL devices schdeuled to be deactivated: " + str(deviceCount))
-    logging.debug("TOTAL devices deactivated: " + str(count))
-    print "TOTAL devices schdeuled to be deactivated: " + str(deviceCount)
-    print "TOTAL devices deactivated: " + str(count)
-
-    if (VERBOSE_LOGGING == "verbose"):
-        logging.debug("END - deactivateDevices")
-        print "END - deactivateDevices"
+    logging.info("TOTAL devices schdeuled to be deactivated: " + str(deviceCount))
+    logging.info("TOTAL devices deactivated: " + str(count))
 
     logging.debug("END - DeactivateDevices")
 
-getLoggingLevel()
+setLoggingLevel()
 deactivateDevices()
