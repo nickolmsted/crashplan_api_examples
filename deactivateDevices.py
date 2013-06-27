@@ -1,7 +1,7 @@
 #
 # File: deactivateDevices.py
 # Author: Nick Olmsted, Code 42 Software
-# Last Modified: 03-08-2013
+# Last Modified: 05-24-2013
 #
 # Uses relativedelta python module that can be downloaded from:
 # http://labix.org/python-dateutil
